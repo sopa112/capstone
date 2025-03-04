@@ -7,6 +7,8 @@ import userRoute from './routes/userRoutes.js'
 import gameRoutes from "./routes/gameRouteRoutes.js";
 import navegation from "./routes/generalRoutes.js"
 import memoizationMiddleware from "./middlewares/memorizationMiddleware.js";
+import trackApiUsage from "./middlewares/trackApiUsage.js";
+import apiUsage from "./routes/usage/apiUsageRoute.js";
 
 
 
@@ -14,7 +16,8 @@ const app = express();
 
 // Middlewares
 app.use(express.json());
-app.use(memoizationMiddleware())
+
+app.use(trackApiUsage);
 
 
 
@@ -26,6 +29,8 @@ app.use('/api/users',userRoute)
 app.use('/api/gameroutes',gameRoutes)
 
 app.use('/api/navegation',navegation)
+
+app.use('/api',apiUsage)
 /*
 app.use('/api/OptimizedRoute',OptimizedRoute)
 */

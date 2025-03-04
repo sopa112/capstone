@@ -14,7 +14,7 @@ const router = express.Router();
 
 // Definir rutas
 router.post("/", mapController.createMap);
-router.get("/", mapController.getAllMaps);
+router.get("/allMaps", mapController.getAllMaps);
 router.get("/:id", mapController.getMapById);
 router.put("/:id", mapController.updateMap);
 router.delete("/:id", mapController.deleteMap);
