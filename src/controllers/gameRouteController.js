@@ -13,9 +13,9 @@ const tryCatch = (fn) => async (req, res, next) => {
 const createGameRouteController = (gameRouteService) => ({
 
   createGameRoute: tryCatch(async (req, res) => {
-    console.log("Request body:", req.body); 
+    // console.log("Request body:", req.body);
     const newGameRoute = await gameRouteService.createGameRoute(req.body);
-    console.log(newGameRoute);
+    // console.log(newGameRoute);
     res.status(201).json({ message: "Route created successfully", newGameRoute });
   }),
   

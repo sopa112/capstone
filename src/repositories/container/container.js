@@ -33,7 +33,7 @@ export function createContainer() {
   const obstacleService = new ObstacleService(obstacleRepository);
   const waitPointService = new WaitPointService(waitPointRepository, mapRepository);
   const userService = new UserService(userRepository);
-  const gameRouteService = new GameRouteService(gameRouteRepository, mapRepository);
+  const gameRouteService = new GameRouteService(gameRouteRepository, mapRepository, obstacleRepository, obstacleService);
   const generalService = new GeneralService(mapRepository,obstacleRepository,waitPointRepository,gameRouteRepository)
   
 

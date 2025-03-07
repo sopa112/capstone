@@ -16,9 +16,13 @@ const gameRouteSchema = new mongoose.Schema({
     x: { type: Number, required: true, min: 0 },
     y: { type: Number, required: true, min: 0 },
   },
+  route: {
+    type: Array,
+    required: true,
+  },
   distance: {
     type: Number,
-    required: true,
+    required: false,
     min: 0,
   },
 });

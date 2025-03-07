@@ -1,10 +1,11 @@
-import { createError } from "../utils/error.js";
+import {createError} from "../utils/error.js";
 import {
-  validateDimensions,
-  validatePositionNotOccupied,
+    validateDimensions,
+    validatePositionNotOccupied,
 } from "../utils/validation.js";
-import { toResult, handleResult } from "../utils/resultUtils.js";
+import {toResult, handleResult} from "../utils/resultUtils.js";
 import obstacleRepository from "../repositories/obstacleRepository.js";
+
 // import sleep from "sleep"
 
 
@@ -15,8 +16,8 @@ import obstacleRepository from "../repositories/obstacleRepository.js";
  * @constructor
  */
 function Position(x, y) {
-  this.x = x
-  this.y = y
+    this.x = x
+    this.y = y
 }
 
 /**
@@ -27,316 +28,392 @@ function Position(x, y) {
  * @constructor
  */
 function Cell(data, type, from) {
-  this.position = data
-  this.from = from
-  this.type = type
-  this.h = 0
-  this.g = 0
+    this.position = data
+    this.from = from
+    this.type = type
+    this.h = 0
+    this.g = 0
 
-  this.getF = function() {
-    return this.h + this.g
-  }
+    this.getF = function () {
+        return this.h + this.g
+    }
 
-  this.setH = function(h) {
-    this.h = h
-    return this
-  }
+    this.setH = function (h) {
+        this.h = h
+        return this
+    }
 
-  this.setG = function (g) {
-    this.g = g
-    return this
-  }
-  this.getG = function() {
-    return this.g
-  }
+    this.setG = function (g) {
+        this.g = g
+        return this
+    }
+    this.getG = function () {
+        return this.g
+    }
 
 }
 
 class MyMap {
-  /**
-   * @property start
-   * @type {{x: number, y: number}}
-   */
-  start
+    /**
+     * @property start
+     * @type {{x: number, y: number}}
+     */
+    start
 
-  /**
-   * @property end
-   * @type {{x: number, y: number}}
-   */
-  end
+    /**
+     * @property end
+     * @type {{x: number, y: number}}
+     */
+    end
 
-  /**
-   * @property dimensions
-   * @type {{width: number, height: number}}
-   */
-  dimensions
+    /**
+     * @property dimensions
+     * @type {{width: number, height: number}}
+     */
+    dimensions
 
-  /**
-   *
-   * @property obstacles
-   * @type {{x: number, y: number}[]}
-   */
-  obstacles
+    /**
+     *
+     * @property obstacles
+     * @type {{x: number, y: number}[]}
+     */
+    obstacles
+
+    /**
+     * @property waitPoints
+     * @type {{
+     *      points: {[key:string]: {x:number, y:number}},
+     *      relation: {from:string, to:string}[]
+     *  }}
+     */
+    waitPoints
 
 
+    constructor(map) {
+        this.map = map
+        console.log("Dimensions: ", map.value.dimensions)
 
-  constructor(map) {
-    this.map = map
-    console.log("Dimensions: ", map.value.dimensions)
+        this.dimensions = map.value.dimensions
 
-    this.dimensions = map.value.dimensions
-  }
-
-  /**
-   *
-   * @param gameRouteData
-   * @return boolean
-   */
-  applyRoute(gameRouteData) {
-    const {start, end} = gameRouteData
-    let isOk = true
-
-    if (this.obstacles && this.obstacles.length) {
-      for (const obstacle of this.obstacles) {
-        if (obstacle.x === start.x && obstacle.y === start.y || obstacle.x === end.x && obstacle.y === end.y) {
-          isOk = false
+        if (map.value.obstacles && map.value.obstacles.length) {
+            this.obstacles = map.value.obstacles
         }
-      }
     }
 
-    if (isOk) {
-
-    this.start = start
-    this.end = end
+    /**
+     *
+     * @param {{x: number, y: number}[]} obstacles
+     */
+    addObstacles(obstacles) {
+        if (obstacles)
+            for (const obstacle of obstacles) {
+                this.obstacles.push(obstacle)
+            }
     }
 
-    return isOk
-  }
-
-  /**
-   *
-   * @return {Cell[][]}
-   */
-  getMatriz() {
-    /**@type{Array<Array<Cell>>}*/
-    const matriz = []
-
-    for (let i = 0; i < this.dimensions.width; i++) {
-      /**@type{Array<Cell>}*/
-      const column = []
-      for (let j = 0; j < this.dimensions.height; j++) {
-        column.push(new Cell(new Position(i, j), "0"))
-      }
-      matriz.push(column)
+    /**
+     *
+     * @param {{
+     *      points: {[key:String]: {x:number, y:number}},
+     *      relation: {from:String, to:String}[]
+     *  }} waitPoints
+     */
+    addWaitPoints(waitPoints) {
+        this.waitPoints = waitPoints
     }
 
-    for (const i of this.obstacles) {
-      console.log("Obstacle:", i.x, i.y)
-      matriz[i.x][i.y] = new Cell(new Position(i.x, i.y), "X")
+    /**
+     * @param {{
+     *  start: {x:number, y:number},
+     *  end: {x:number, y:number},
+     *  obstacles: {x:number, y:number}[],
+     *  waitPoints: {
+     *      points: {[key:string]: {x:number, y:number}},
+     *      relation: {from:string, to:string}[]
+     *  }
+     * }} gameRouteData
+     * @return boolean
+     */
+    applyRoute(gameRouteData) {
+        const {start, end} = gameRouteData
+        let isOk = true
+
+        // Check if the start and end coordinates are within the map dimensions
+        if (this.obstacles && this.obstacles.length) {
+            for (const obstacle of this.obstacles) {
+                if (obstacle.x === start.x && obstacle.y === start.y || obstacle.x === end.x && obstacle.y === end.y) {
+                    isOk = false
+                }
+            }
+        }
+
+        if (isOk) {
+            this.start = start
+            this.end = end
+
+            this.addObstacles(gameRouteData.obstacles)
+            this.addWaitPoints(gameRouteData.waitPoints)
+        }
+
+        return isOk
     }
 
-    console.log("Start:", this.start.x,  this.start.y)
-    matriz[this.start.x][this.start.y] = new Cell(new Position(this.start.x, this.start.y), "S")
+    /**
+     *
+     * @return {Cell[][]}
+     */
+    getMatriz() {
+        /**@type{Array<Array<Cell>>}*/
+        const matriz = []
 
-    console.log("End:", this.end.x,  this.end.y)
-    matriz[this.end.x][this.end.y] = new Cell(new Position(this.end.x, this.end.y), "E")
-
-    return matriz
-  }
-
-  /**
-   * @param obstacleRepository {ObstacleRepository}
-   */
-   async findObstacles(obstacleRepository) {
-    if (this.map.value.obstacles && this.map.value.obstacles.length) {
-      this.obstacles = (await toResult(obstacleRepository.findByMapId(this.map.value._id))).value
-
-      // console.log(this.obstacles)
-
-      // for (let i = 0; i < this.map.value.obstacles.length; i++) {
-      //   console.log(Object.getOwnPropertyDescriptor(obstacleRepository))
-      //   console.log(await toResult(obstacleRepository.findByMapId(this.map.value._id)))
-      // }
-    }
-  }
-
-  findRoute() {
-    const matriz = this.getMatriz()
-
-
-
-    /** @type Cell[] */
-    const closedList = []
-
-    /** @type Cell[] */
-    const openList = []
-
-    const start = matriz[this.start.x][this.start.y]
-    const end = matriz[this.end.x][this.end.y]
-
-    openList.push(start)
-
-    while (openList.length) {
-      /**@type {Cell | undefined}*/
-      let actualNode
-
-      for (const element of openList) {
-
-        if (actualNode === undefined || element.getF() < actualNode.getF()) {
-          actualNode = element
-        }
-      }
-
-      console.log("actualNode", actualNode)
-
-      if (actualNode) {
-        closedList.push(actualNode)
-        openList.splice(openList.indexOf(actualNode), 1)
-        // console.log(closedList.length)
-        // console.log(openList.length)
-
-        if (actualNode.position === end.position) {
-          // console.log("Es el nodo final")
-          break
-        }
-      }
-
-
-      // console.log("ActualNode", actualNode)
-
-      // sleep
-
-      const left = new Position(actualNode.position.x-1, actualNode.position.y)
-      const right = new Position(actualNode.position.x+1, actualNode.position.y)
-      const up = new Position(actualNode.position.x, actualNode.position.y-1)
-      const down = new Position(actualNode.position.x, actualNode.position.y+1)
-
-      /**@type{Cell[]}*/
-      const neighborhood = []
-      if (left.x >= 0 && left.x < this.dimensions.width && left.y >= 0 && left.y < this.dimensions.height)
-        neighborhood.push(matriz[left.x][left.y])
-      if (right.x >= 0 && right.x < this.dimensions.width && right.y >= 0 && right.y < this.dimensions.height)
-        neighborhood.push(matriz[right.x][right.y])
-      if (up.x >= 0 && up.x < this.dimensions.width && up.y >= 0 && up.y < this.dimensions.height)
-        neighborhood.push(matriz[up.x][up.y])
-      if (down.x >= 0 && down.x < this.dimensions.width && down.y >= 0 && down.y < this.dimensions.height)
-        neighborhood.push(matriz[down.x][down.y])
-
-      // console.log(neighborhood)
-
-      for (let i=0; i<neighborhood.length; i++) {
-        // console.log("interacting")
-        if (closedList.includes(neighborhood[i]) || neighborhood[i].type === "X") {
-          // console.log(closedList.includes(neighborhood[i]), neighborhood[i].type === "X")
-          // console.log("closedLisd", closedList)
-          // console.log("closedList includes", neighborhood[i])
-          // console.log(closedList)
-          continue
+        for (let i = 0; i < this.dimensions.width; i++) {
+            /**@type{Array<Cell>}*/
+            const column = []
+            for (let j = 0; j < this.dimensions.height; j++) {
+                column.push(new Cell(new Position(i, j), "0"))
+            }
+            matriz.push(column)
         }
 
-
-        // console.log(neighborhood[i])
-        neighborhood[i].setG(actualNode.getG() + Math.hypot(
-            neighborhood[i].position.x - actualNode.position.x,
-            neighborhood[i].position.y - actualNode.position.y
-        ))
-        neighborhood[i].setH(Math.hypot(
-            end.position.x - neighborhood[i].position.x,
-            end.position.y - neighborhood[i].position.y)
-        )
-        // console.log('end', end)
-        // console.log(neighborhood[i])
-
-        let onOpenList, item
-        // console.log("openList", openList)
-        for (const index in openList) {
-          if (openList[index].position === neighborhood[i].position)
-            onOpenList = true
-            item = openList[index].position
-
+        for (const i of this.obstacles) {
+            console.log("Obstacle:", i.x, i.y)
+            matriz[i.x][i.y] = new Cell(new Position(i.x, i.y), "X")
         }
 
-        if (onOpenList) {
-          if (neighborhood[i].g > item.g)
-            continue
-        }
+        console.log("Start:", this.start.x, this.start.y)
+        matriz[this.start.x][this.start.y] = new Cell(new Position(this.start.x, this.start.y), "S")
 
-        openList.push(neighborhood[i])
-      }
+        console.log("End:", this.end.x, this.end.y)
+        matriz[this.end.x][this.end.y] = new Cell(new Position(this.end.x, this.end.y), "E")
 
-
-
+        return matriz
     }
 
-    /*let counter = 0
+    /**
+     * @param obstacleRepository {ObstacleRepository}
+     */
+    async findObstacles(obstacleRepository) {
+        if (this.map.value.obstacles && this.map.value.obstacles.length) {
+            this.obstacles = (await toResult(obstacleRepository.findByMapId(this.map.value._id))).value
 
-    function Cell(position) {
-      this.position = position
-      /!** @type {number} *!/
-      this.distance = Math.hypot(end.x-this.position.x, end.y-this.position.y+1)
+            // console.log(this.obstacles)
 
-      this.isOut = position.x < 0 || position.x >= dimensions.width || position.y < 0 || position.y >= dimensions.height
-      console.log(position.x < 0, position.x >= dimensions.width, position.y < 0, position.y >= dimensions.height)
-      console.log(this.isOut, this.position)
-
-      /!** @type {{x: number, y: number}[]} *!/
-      let next = []
-
-      if (!this.isOut && counter<20) {
-        next[0] = {x:this.position.x, y:this.position.y-1}
-        next[1] = {x:this.position.x+1, y:this.position.y}
-        next[2] = {x:this.position.x, y:this.position.y+1}
-        next[3] = {x:this.position.x-1, y:this.position.y}
-      }
-
-      for (let i = next.length-1; i >= 0; i--) {
-        if (next[i].isOut) {
-          next.splice(i, 1)8
+            // for (let i = 0; i < this.map.value.obstacles.length; i++) {
+            //   console.log(Object.getOwnPropertyDescriptor(obstacleRepository))
+            //   console.log(await toResult(obstacleRepository.findByMapId(this.map.value._id)))
+            // }
         }
-      }
+    }
 
-      for (let i = 0; i<4; i++) {
-        for (let j = i+1; j<4; j++) {
-          if (next[i].distance > next[j].distance) {
-            const c = next[i]
-            next[i] = next[j]
-            next[j] = c
+    findRoute() {
+        /** @type {Cell[][]} */
+        const grid = this.getMatriz()
+
+        let startNode = grid[this.start.x][this.start.y];
+        let endNode = grid[this.end.x][this.end.y];
+
+        // Buscar el nodo de inicio y el nodo final en la matriz
+        /*for (let y = 0; y < grid.length; y++) { Todo: No va a hacer falta
+          for (let x = 0; x < grid[y].length; x++) {
+            if (grid[y][x].type === "s") {
+              startNode = grid[y][x];
+            } else if (grid[y][x].type === "e") {
+              endNode = grid[y][x];
+            }
           }
+        }*/
+
+        if (this.waitPoints && this.waitPoints.relation && this.waitPoints.relation.length) {
+            let routes = []
+
+            for (let i = 0; i < this.waitPoints.relation.length; i++) {
+                if (i === 0) {
+                    const map = new MyMap({
+                        value: {
+                            dimensions: this.dimensions,
+                            obstacles: this.obstacles
+                        }
+                    })
+                    map.applyRoute({
+                        start: this.start,
+                        end: this.waitPoints.points[this.waitPoints.relation[i].from]
+                    })
+
+                    routes.push(map.findRoute()[0])
+                }
+
+                const _map = new MyMap({
+                    value: {
+                        dimensions: this.dimensions,
+                        obstacles: this.obstacles
+                    }
+                })
+                _map.applyRoute({
+                    start: this.waitPoints.points[this.waitPoints.relation[i].from],
+                    end: this.waitPoints.points[this.waitPoints.relation[i].to],
+                })
+
+                routes.push(_map.findRoute()[0])
+
+                if (i === this.waitPoints.relation.length - 1) {
+                    const map = new MyMap({
+                        value: {
+                            obstacles: this.obstacles,
+                            dimensions: this.dimensions
+                        }
+                    })
+                    map.applyRoute({
+                        start: this.waitPoints.points[this.waitPoints.relation[i].to],
+                        end: this.end,
+                    })
+
+                    routes.push(map.findRoute()[0])
+                }
+            }
+
+            if (routes) return routes
         }
-      }
 
-      console.log(next)
+        if (!startNode || !endNode) {
+            console.error("No se encontró el nodo de inicio o final.");
+            return [];
+        }
 
-      // next[0] = {
-      //   x:this.position.x,
-      //   y:this.position.y+1,
-      //   distance:Math.hypot(end.x-this.position.x, end.y-this.position.y+1)
-      // }
+        // Inicializar propiedades para cada nodo
+        for (let x = 0; x < grid.length; x++) {
+            for (let y = 0; y < grid[x].length; y++) {
+                grid[x][y].g = Infinity;      // Costo desde el inicio
+                grid[x][y].h = 0;             // Heurística (estimación al final)
+                grid[x][y].f = Infinity;      // f = g + h
+                grid[x][y].previous = null;   // Para reconstruir el camino
+            }
+        }
 
-      // console.log(next)
-      counter ++
-    }*/
+        /** Función heurística (distancia Manhattan)
+         *
+         * @param {Cell} a
+         * @param {Cell} b
+         * @returns {number}
+         */
+        function heuristic(a, b) {
+            return Math.abs(a.position.x - b.position.x) + Math.abs(a.position.y - b.position.y);
+        }
 
-    // const cell = new Cell(actual)
-  }
+        // Inicializar el nodo de inicio
+        startNode.g = 0;
+        startNode.h = heuristic(startNode, endNode);
+        startNode.f = startNode.g + startNode.h;
 
-  toString() {
-    const matriz = this.getMatriz()
+        let openSet = [startNode]; // Nodos a evaluar
+        let closedSet = [];        // Nodos ya evaluados
 
+        // Función para obtener los vecinos (4 direcciones: arriba, derecha, abajo, izquierda)
+        function getNeighbors(node) {
+            let neighbors = [];
+            const {x, y} = node.position;
+            const directions = [
+                {x: 0, y: -1}, // Arriba
+                {x: 1, y: 0},  // Derecha
+                {x: 0, y: 1},  // Abajo
+                {x: -1, y: 0}  // Izquierda
+            ];
 
+            for (let dir of directions) {
+                let newX = x + dir.x;
+                let newY = y + dir.y;
+                // Verificar que el nuevo nodo esté dentro de los límites de la matriz
+                if (newX >= 0 && newX < grid.length && newY >= 0 && newY < grid[0].length) {
+                    neighbors.push(grid[newX][newY]); // Accedemos como grid[y][x]
+                }
+            }
+            return neighbors;
+        }
 
-    let result = ""
+        // Bucle principal del algoritmo A*
+        while (openSet.length > 0) {
+            // Encontrar el nodo con el menor valor f en openSet
+            let currentIndex = 0;
+            for (let i = 0; i < openSet.length; i++) {
+                if (openSet[i].f < openSet[currentIndex].f) {
+                    currentIndex = i;
+                }
+            }
+            let current = openSet[currentIndex];
+            // console.log('current:',current)
 
-    for (let i = 0; i < matriz[0].length; i++) {
-      if (i > 0) result+="\n"
+            // Si se ha alcanzado el nodo final, reconstruir el camino
+            if (current === endNode) {
+                let path = [];
+                let temp = current;
+                while (temp) {
+                    path.push(temp.position);
+                    let ant = temp
+                    temp = temp.previous;
+                    // delete ant.previous
+                    // delete ant.f
+                    // delete ant.g
+                    // delete ant.h
+                    // delete ant.type
+                }
+                // El camino se construyó de final a inicio, se invierte antes de retornar
+                // console.log("entra")
+                return [path.reverse()];
+            }
 
-      for (const element of matriz) {
-        result += element[i].type
-      }
+            // Eliminar el nodo actual de openSet y agregarlo a closedSet
+            openSet.splice(currentIndex, 1);
+            closedSet.push(current);
+
+            // Evaluar los vecinos del nodo actual
+            let neighbors = getNeighbors(current);
+            for (let neighbor of neighbors) {
+                // Ignorar si el vecino es un obstáculo o ya se evaluó
+                if (neighbor.type === "X" || closedSet.includes(neighbor)) {
+                    continue;
+                }
+
+                let tentativeG = current.g + 1; // Costo para movernos a un vecino (se asume costo uniforme = 1)
+                let newPath = false;
+
+                // Si el vecino no está en openSet, o encontramos un camino más corto para llegar a él
+                if (!openSet.includes(neighbor)) {
+                    openSet.push(neighbor);
+                    newPath = true;
+                } else if (tentativeG < neighbor.g) {
+                    newPath = true;
+                }
+
+                // Actualizar los valores del vecino
+                if (newPath) {
+                    neighbor.g = tentativeG;
+                    neighbor.h = heuristic(neighbor, endNode);
+                    neighbor.f = neighbor.g + neighbor.h;
+                    neighbor.previous = current;
+                }
+            }
+        }
+
+        // Si se agota openSet sin alcanzar el nodo final, no existe camino posible
+        console.error("No se encontró un camino.");
+        return [];
     }
 
-    return result
-  }
+    toString() {
+        const matriz = this.getMatriz()
+
+
+        let result = ""
+
+        for (let i = 0; i < matriz[0].length; i++) {
+            if (i > 0) result += "\n"
+
+            for (const element of matriz) {
+                result += element[i].type
+            }
+        }
+
+        return result
+    }
 }
 
 /**
@@ -346,158 +423,167 @@ class MyMap {
  * @property obstacleService
  */
 class GameRouteService {
-  constructor(gameRouteRepository, mapRepository, obstacleRepository, obstacleService) {
-    this.gameRouteRepository = gameRouteRepository;
-    this.mapRepository = mapRepository;
-    this.obstacleRepository = obstacleRepository;
-    this.obstacleService = obstacleService
-  }
-
-  // Validate that the game route exists
-  async validateGameRouteExists(id) {
-    const routeResult = await toResult(this.gameRouteRepository.findById(id));
-    const route = handleResult(routeResult, null, 404);
-
-    if (!route) {
-      throw createError("Game route does not exist", 404);
+    constructor(gameRouteRepository, mapRepository, obstacleRepository, obstacleService) {
+        this.gameRouteRepository = gameRouteRepository;
+        this.mapRepository = mapRepository;
+        this.obstacleRepository = obstacleRepository;
+        this.obstacleService = obstacleService
     }
 
-    return route;
-  }
+    // Validate that the game route exists
+    async validateGameRouteExists(id) {
+        const routeResult = await toResult(this.gameRouteRepository.findById(id));
+        const route = handleResult(routeResult, null, 404);
 
-  /**
-   *
-   * @param mapId {String} MapId for searching on DB
-   * @returns {Promise<MyMap>} Promise about a string matriz that represents the map state
-   */
-  // Validate start and end coordinates
-  // Todo: Voy a cambiar esto para que solo devuelva el mapa si este existe de la logica de comparacion
-  async getMap(mapId) {
-    const mapResult = await toResult(this.mapRepository.findById(mapId));
-    const existingMap = handleResult(mapResult, "Map does not exist", 404);
+        if (!route) {
+            throw createError("Game route does not exist", 404);
+        }
 
-    if (!existingMap || !existingMap.dimensions) {
-      throw createError("Map does not exist or is invalid", 404);
+        return route;
     }
 
-    const myMap =  new MyMap(mapResult)
+    /**
+     *
+     * @param mapId {String} MapId for searching on DB
+     * @returns {Promise<MyMap>} Promise about a string matriz that represents the map state
+     */
+    // Validate start and end coordinates
+    // Todo: Voy a cambiar esto para que solo devuelva el mapa si este existe de la logica de comparacion
+    async getMap(mapId) {
+        const mapResult = await toResult(this.mapRepository.findById(mapId));
+        const existingMap = handleResult(mapResult, "Map does not exist", 404);
 
-    await myMap.findObstacles(this.obstacleRepository)
+        if (!existingMap || !existingMap.dimensions) {
+            throw createError("Map does not exist or is invalid", 404);
+        }
 
-    return myMap
+        const myMap = new MyMap(mapResult)
 
-    // if (!validateDimensions(existingMap.dimensions, [start, end])) {
-    //   throw createError("Route coordinates exceed the map dimensions", 400);
-    // }
+        await myMap.findObstacles(this.obstacleRepository)
 
-    // await validatePositionNotOccupied([start, end], mapId);
-  }
+        return myMap
 
-  /**
-   *
-   * @param gameRouteInitialData {{
-   *   "mapId": string,
-   *   "start": {
-   *     "x": number,
-   *     "y": number
-   *   },
-   *   "end": {
-   *     "x": number,
-   *     "y": number
-   *   },
-   *   "distance": number
-   * }}
-   * @param map
-   * @returns boolean
-   */
-  validateMap(gameRouteInitialData, map) {
-    let isMapCorrect = false
+        // if (!validateDimensions(existingMap.dimensions, [start, end])) {
+        //   throw createError("Route coordinates exceed the map dimensions", 400);
+        // }
 
-
-
-    return isMapCorrect
-  }
-
-  async createGameRoute(gameRouteData) {
-    const { mapId, start, end } = gameRouteData;
-
-    // const map = await toResult(this.mapRepository.findById(mapId));
-
-    const map = await this.getMap(mapId);
-
-    if (!map.applyRoute(gameRouteData))
-      throw new Error("La ruta no se pudo aplicar, es erronea")
-
-
-    map.findRoute()
-
-    console.log(map.toString())
-
-    // const isMapCorrect = this.validateMap(gameRouteData, map)
-
-    /*// Attempt to create the game route
-    let routeResult;
-    try {
-      routeResult = await this.gameRouteRepository.create(gameRouteData);
-    } catch (error) {
-      console.error("Error creating game route:", error);
-      throw createError("Error creating game route", 500);
+        // await validatePositionNotOccupied([start, end], mapId);
     }
 
-    if (!routeResult) {
-      console.error("Error: routeResult is undefined or null");
-      throw createError("Error creating game route", 500);
-    }*/
+    /**
+     *
+     * @param gameRouteInitialData {{
+     *   "mapId": string,
+     *   "start": {
+     *     "x": number,
+     *     "y": number
+     *   },
+     *   "end": {
+     *     "x": number,
+     *     "y": number
+     *   },
+     *   "distance": number
+     * }}
+     * @param map
+     * @returns boolean
+     */
+    validateMap(gameRouteInitialData, map) {
+        let isMapCorrect = false
 
-    // Return the created route if everything went well
-    // return routeResult;
-  }
 
-  async getGameRoutesByMapId(mapId) {
-    // Validate that the map exists
-    const mapResult = await toResult(this.mapRepository.findById(mapId));
-    const map = handleResult(mapResult, "Map not found", 404);
-
-    // If the map does not exist, throw an error
-    if (!map) {
-      throw new Error("Map not found");
+        return isMapCorrect
     }
 
-    // Retrieve the routes associated with the map
-    const routesResult = await toResult(
-      this.gameRouteRepository.findByMapId(mapId)
-    );
-    return handleResult(routesResult, "Error fetching game routes", 500);
-  }
+    async createGameRoute(gameRouteData) {
+        const {mapId, start, end} = gameRouteData;
 
-  async getGameRouteById(id) {
-    return await this.validateGameRouteExists(id);
-  }
+        // const map = await toResult(this.mapRepository.findById(mapId));
 
-  // Update a game route by ID
-  async updateGameRouteById(id, updateData) {
-    const { start, end } = updateData;
-    const gameRoute = await this.validateGameRouteExists(id);
-    await this.validateStartEndPositions(gameRoute.mapId, start, end);
+        const map = await this.getMap(mapId);
 
-    const updateResult = await toResult(
-      this.gameRouteRepository.updateById(id, updateData)
-    );
-    return handleResult(updateResult, "Game route does not exist", 404);
-  }
+        if (!map.applyRoute(gameRouteData))
+            throw new Error("La ruta no se pudo aplicar, es erronea")
 
-  // Delete a game route by ID
-  async deleteGameRouteById(id) {
-    const route = await this.validateGameRouteExists(id);
-    if (!route) {
-      throw createError("Game route does not exist", 404);
+
+        const route = map.findRoute()
+
+        const response = this.gameRouteRepository.create({
+            mapId: gameRouteData.mapId,
+            start: gameRouteData.start,
+            end: gameRouteData.end,
+            route: route
+        })
+        console.log(response.value)
+
+        return response.value
+
+        // console.log(map.toString())
+
+        // const isMapCorrect = this.validateMap(gameRouteData, map)
+
+        /*// Attempt to create the game route
+        let routeResult;
+        try {
+          routeResult = await this.gameRouteRepository.create(gameRouteData);
+        } catch (error) {
+          console.error("Error creating game route:", error);
+          throw createError("Error creating game route", 500);
+        }
+
+        if (!routeResult) {
+          console.error("Error: routeResult is undefined or null");
+          throw createError("Error creating game route", 500);
+        }*/
+
+        // Return the created route if everything went well
+        // return routeResult;
     }
 
-    const deleteResult = await toResult(
-      this.gameRouteRepository.deleteById(id)
-    );
-    return handleResult(deleteResult, "Error deleting game route", 500);
-  }
+    async getGameRoutesByMapId(mapId) {
+        // Validate that the map exists
+        const mapResult = await toResult(this.mapRepository.findById(mapId));
+        const map = handleResult(mapResult, "Map not found", 404);
+
+        // If the map does not exist, throw an error
+        if (!map) {
+            throw new Error("Map not found");
+        }
+
+        // Retrieve the routes associated with the map
+        const routesResult = await toResult(
+            this.gameRouteRepository.findByMapId(mapId)
+        );
+        return handleResult(routesResult, "Error fetching game routes", 500);
+    }
+
+    async getGameRouteById(id) {
+        return await this.validateGameRouteExists(id);
+    }
+
+    // Update a game route by ID
+    async updateGameRouteById(id, updateData) {
+        const {start, end} = updateData;
+        const gameRoute = await this.validateGameRouteExists(id);
+        await this.validateStartEndPositions(gameRoute.mapId, start, end);
+
+        const updateResult = await toResult(
+            this.gameRouteRepository.updateById(id, updateData)
+        );
+        return handleResult(updateResult, "Game route does not exist", 404);
+    }
+
+    // Delete a game route by ID
+    async deleteGameRouteById(id) {
+        const route = await this.validateGameRouteExists(id);
+        if (!route) {
+            throw createError("Game route does not exist", 404);
+        }
+
+        const deleteResult = await toResult(
+            this.gameRouteRepository.deleteById(id)
+        );
+        return handleResult(deleteResult, "Error deleting game route", 500);
+    }
 }
 
 export default GameRouteService;
